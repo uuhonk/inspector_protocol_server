@@ -1,0 +1,21 @@
+[package]
+name = "inspector_protocol_server"
+version = "0.1.0"
+edition = "2021"
+description = "Bevy 的 Just Inspector 服务端：通过 JSON WebSocket 协议暴露 `Inspector` resource（协议文档在 just_inspector 仓库的 `docs/protocol.md`）。"
+license = "MIT"
+
+[dependencies]
+bevy_app = "0.19"
+bevy_ecs = "0.19"
+# 协议 schema 的独立仓库。要让服务端跟上协议 crate 的新提交：`cargo update -p inspector_protocol`。
+inspector_protocol = { git = "https://github.com/uuhonk/inspector_protocol.git", branch = "main" }
+crossbeam-channel = "0.5"
+futures-util = "0.3"
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+tokio-tungstenite = "0.30"
+
+[dev-dependencies]
+# 协议测试覆盖 glam 向量字段（`Vec2` -> `"vec2"`）。
+bevy_math = "0.19"
