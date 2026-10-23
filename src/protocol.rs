@@ -75,7 +75,7 @@ pub fn node_json(
 /// `id` 在协议里叫 `name`（和 property 一致），`confirm` 走 `danger` —— 前端
 /// 只需要知道"这是个要小心的操作"，不必理解它具体是什么。
 pub fn button_json(button: &InspectorButton) -> Value {
-    let action = &button.action;
+    let action = button;
     let mut json = json!({ "name": action.id, "label": action.label });
     if let Some(hint) = action.hint {
         json["tooltip"] = hint.into();

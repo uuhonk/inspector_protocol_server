@@ -13,6 +13,7 @@ use inspector_protocol_server::{InspectorRegistryExt, JustInspectorPlugin};
 use serde_json::{json, Value};
 
 #[derive(Resource, inspector_protocol::Inspector, Debug, PartialEq)]
+#[inspector(context = World)]
 struct TestConfig {
     /// 不分组：它出现在第一个 `#[inspector_group(..)]` *之前*。
     ///
@@ -64,7 +65,7 @@ fn protocol_roundtrip() {
         center: bevy_math::Vec2::new(4.0, -2.5),
         edge: inspector_protocol::Curve::linear(&[(0.0, 0.0), (0.5, 1.0), (1.0, -0.5)]),
     })
-    .register_inspector::<TestConfig>();
+    .register_inspector_with_actions::<TestConfig>();
 
     let (done_tx, done_rx) = std::sync::mpsc::channel::<Result<(), String>>();
     std::thread::spawn(move || {
@@ -110,7 +111,7 @@ async fn run_client() {
         for attempt in 0..50 {
             match tokio_tungstenite::connect_async(&url).await {
                 Ok(conn) => break 'connect conn,
-                Err(e) if attempt < 49 => tokio::time::sleep(Duration::from_millis(100)).await,
+                Err(_e) if attempt < 49 => tokio::time::sleep(Duration::from_millis(100)).await,
                 Err(e) => panic!("connect {url} after retries: {e}"),
             }
         }

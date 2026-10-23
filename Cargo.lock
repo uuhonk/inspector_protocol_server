@@ -720,7 +720,6 @@ dependencies = [
 name = "inspector_protocol"
 version = "0.1.0"
 dependencies = [
- "bevy_ecs",
  "inspector_protocol_derive",
  "serde",
 ]

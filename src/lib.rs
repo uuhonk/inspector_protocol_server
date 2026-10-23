@@ -38,7 +38,7 @@ use bevy_ecs::component::Mutable;
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Entity, Message, Res, ResMut, Resource, World};
 use bevy_ecs::schedule::IntoScheduleConfigs;
-use inspector_protocol::{FieldInfo, FieldValue, Inspector};
+use inspector_protocol::{FieldInfo, FieldValue, Inspector, InspectorActions};
 use serde_json::json;
 
 use protocol::{node_json, tree_json, value_from_json, value_json};
@@ -75,6 +75,7 @@ struct Registration {
     /// 在 `register_inspector` 时捕获；如果那时 resource 还没被插入，
     /// 就改在第一次读取时填充。
     defaults: Vec<FieldInfo>,
+    invoke_action: Option<fn(&mut World, &str) -> Result<String, String>>,
 }
 
 fn make_registration<T>(defaults: Vec<FieldInfo>) -> Registration
@@ -104,6 +105,7 @@ where
             true
         },
         defaults,
+        invoke_action: None,
     }
 }
 
@@ -120,21 +122,22 @@ fn run_action(
     world: &mut World,
     action: &str,
 ) -> Result<String, (i32, String)> {
-    let field_button = (reg.read_fields)(world).into_iter().find_map(|field| {
-        field
-            .buttons
-            .iter()
-            .find(|b| b.action.id == action)
-            .copied()
-    });
+    let field_button = (reg.read_fields)(world)
+        .into_iter()
+        .find_map(|field| field.buttons.iter().find(|b| b.id == action).copied());
     let button = field_button.or_else(|| {
         (reg.read_buttons)(world)
             .iter()
-            .find(|b| b.action.id == action)
+            .find(|b| b.id == action)
             .copied()
     });
     match button {
-        Some(button) => (button.run)(world).map_err(|message| (4106, message)),
+        Some(_) => reg
+            .invoke_action
+            .ok_or_else(|| (4105, "Actions were not registered for this type".into()))?(
+            world, action,
+        )
+        .map_err(|message| (4106, message)),
         None => Err((4105, format!("Unknown action: {}.{action}", reg.node_id))),
     }
 }
@@ -232,6 +235,11 @@ pub trait InspectorRegistryExt {
     where
         T: Resource<Mutability = Mutable> + Inspector;
 
+    /// Register an inspector and explicitly connect its World action dispatcher.
+    fn register_inspector_with_actions<T>(&mut self) -> &mut Self
+    where
+        T: Resource<Mutability = Mutable> + Inspector + InspectorActions<World>;
+
     /// 把 app 的 entity 放进 tree：`App::register_world_tree(tree)`。
     ///
     /// tree 是可选的 —— 没什么可浏览的游戏干脆不注册它，此时协议的
@@ -257,6 +265,20 @@ impl InspectorRegistryExt for App {
             .resource_mut::<InspectorRegistry>()
             .registrations
             .push(make_registration::<T>(defaults));
+        self
+    }
+
+    fn register_inspector_with_actions<T>(&mut self) -> &mut Self
+    where
+        T: Resource<Mutability = Mutable> + Inspector + InspectorActions<World>,
+    {
+        self.register_inspector::<T>();
+        self.world_mut()
+            .resource_mut::<InspectorRegistry>()
+            .registrations
+            .last_mut()
+            .unwrap()
+            .invoke_action = Some(T::invoke_action);
         self
     }
 
@@ -550,16 +572,10 @@ mod tests {
     }
 
     /// 字段上挂的按钮（`&[..]` 在函数体里不是 `'static`，所以要做成 const 项）。
-    const FIELD_BUTTONS: &[InspectorButton] = &[InspectorButton::new(
-        InspectorAction::new("bump", "加一"),
-        bump,
-    )];
+    const FIELD_BUTTONS: &[InspectorButton] = &[InspectorAction::new("bump", "加一")];
 
     /// 类型上挂的按钮。
-    const TYPE_BUTTONS: &[InspectorButton] = &[InspectorButton::new(
-        InspectorAction::new("boom", "炸").confirm(),
-        boom,
-    )];
+    const TYPE_BUTTONS: &[InspectorButton] = &[InspectorAction::new("boom", "炸").confirm()];
 
     /// 一个手搭的 registration：`bump` 挂在**字段**上（模拟 `#[inspector(button(..))]`
     /// 写在一个字段上），`boom` 挂在**类型**上（面板顶部那一行）。
@@ -582,6 +598,11 @@ mod tests {
             read_buttons: |_| TYPE_BUTTONS,
             apply_field: |_, _, _| false,
             defaults: Vec::new(),
+            invoke_action: Some(|world, action| match action {
+                "bump" => bump(world),
+                "boom" => boom(world),
+                _ => Err("unknown".into()),
+            }),
         }
     }
 

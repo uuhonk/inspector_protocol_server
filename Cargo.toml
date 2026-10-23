@@ -10,7 +10,7 @@ license = "MIT"
 bevy_app = "0.20"
 bevy_ecs = "0.20"
 # 协议 schema 的独立仓库。要让服务端跟上协议 crate 的新提交：`cargo update -p inspector_protocol`。
-inspector_protocol = { git = "https://github.com/uuhonk/inspector_protocol.git", branch = "main" }
+inspector_protocol = { path = "../inspector_protocol" }
 crossbeam-channel = "0.5"
 futures-util = "0.3"
 serde_json = "1"
