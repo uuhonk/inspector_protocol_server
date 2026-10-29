@@ -2,7 +2,7 @@
 name = "inspector_protocol_server"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.97.1"
+rust-version = "1.99.1"
 description = "Bevy 的 Just Inspector 服务端：通过 JSON WebSocket 协议暴露 `Inspector` resource（协议文档在 just_inspector 仓库的 `docs/protocol.md`）。"
 license = "MIT"
 
